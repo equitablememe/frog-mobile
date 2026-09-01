@@ -22,11 +22,6 @@ class AuditedToolExecutor(
         val decision = policy.evaluate(request)
 
         if (decision.authorization != AuthorizationDecision.ALLOW) {
-            val status = if (request.expectedState == null) {
-                VerificationStatus.NOT_ATTEMPTED
-            } else {
-                VerificationStatus.INDETERMINATE
-            }
             return ActionReceipt(
                 invocationId = request.invocationId,
                 requestedIntent = request.requestedIntent,
@@ -41,8 +36,9 @@ class AuditedToolExecutor(
                 executionDetail = null,
                 expectedState = request.expectedState,
                 observedState = null,
-                verification = status,
-                verificationRationale = "Execution was not authorized, so no postcondition was asserted.",
+                verification = VerificationStatus.NOT_ATTEMPTED,
+                verificationRationale =
+                    "Execution was not authorized, so postcondition verification was not attempted.",
                 startedAt = startedAt,
                 completedAt = Instant.now(clock),
                 modelId = modelId,

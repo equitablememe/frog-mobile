@@ -1,0 +1,85 @@
+name: M0 upstream Android preflight
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/m0-upstream-preflight.yml"
+      - "m0/**"
+      - "docs/M0_PREFLIGHT.md"
+
+permissions:
+  contents: read
+
+jobs:
+  build-google-adk-android:
+    name: Build pinned Google ADK Android sample
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout FROG Mobile
+        uses: actions/checkout@v4
+
+      - name: Load pinned upstream revision
+        shell: bash
+        run: |
+          ADK_SHA="$(tr -d '[:space:]' < m0/adk-kotlin.sha)"
+          test -n "$ADK_SHA"
+          echo "ADK_SHA=$ADK_SHA" >> "$GITHUB_ENV"
+          echo "ADK_SHORT_SHA=${ADK_SHA:0:12}" >> "$GITHUB_ENV"
+
+      - name: Checkout pinned google/adk-kotlin
+        uses: actions/checkout@v4
+        with:
+          repository: google/adk-kotlin
+          ref: ${{ env.ADK_SHA }}
+          path: upstream/google-adk-kotlin
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Mirrors google/adk-kotlin's own validation workflow as checked at the
+      # pinned revision: Android platform 36 + build-tools 36.0.0.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: "platforms;android-36 build-tools;36.0.0"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Google's Android examples APK
+        working-directory: upstream/google-adk-kotlin
+        env:
+          GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=1g -Dorg.gradle.daemon=false"
+        run: |
+          ./gradlew             -PjdkVersion=21             -Pkotlin.daemon.jvmargs="-Xmx4g"             --no-daemon             --stacktrace             :google-adk-kotlin-examples-android:assembleDebug
+
+      - name: Record build evidence
+        shell: bash
+        run: |
+          APK="$(find upstream/google-adk-kotlin/examples/android/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          {
+            echo "upstream_repository=google/adk-kotlin"
+            echo "upstream_commit=$ADK_SHA"
+            echo "frog_commit=$GITHUB_SHA"
+            echo "workflow_run_id=$GITHUB_RUN_ID"
+            echo "build_task=:google-adk-kotlin-examples-android:assembleDebug"
+            echo "apk_path=$APK"
+            sha256sum "$APK"
+          } | tee m0-preflight-metadata.txt
+
+      - name: Upload official-sample build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-adk-kotlin-android-${{ env.ADK_SHORT_SHA }}
+          path: |
+            upstream/google-adk-kotlin/examples/android/build/outputs/apk/debug/*.apk
+            m0-preflight-metadata.txt
+          if-no-files-found: error
+          retention-days: 14

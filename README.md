@@ -4,7 +4,9 @@
 
 FROG Mobile is a local-first Android agent experiment built around one engineering rule:
 
-> A tool returning normally is evidence of attempted execution, not proof that the intended device state exists.
+> **A tool return is not a changed world.**
+
+A tool returning normally is evidence of attempted execution, not proof that the intended device state exists.
 
 The project separates:
 
@@ -16,30 +18,42 @@ Many agent demos stop at “the tool call returned.” FROG asks the next questi
 
 **Did the requested state actually happen?**
 
-The first proof is intentionally small: an on-device Android agent requests a reversible flashlight action, FROG applies policy, Android executes it, the device state is observed independently, and an action receipt records whether the requested postcondition was **VERIFIED**, **CONTRADICTED**, **INDETERMINATE**, or **FAILED**.
+The first proof is intentionally small: an on-device Android agent requests a reversible flashlight action, FROG applies policy, Android executes it, the device state is observed independently, and an action receipt records whether the requested postcondition was **VERIFIED**, **CONTRADICTED**, **INDETERMINATE**, **FAILED**, or **NOT_ATTEMPTED**.
 
-## Current evidence
+## Current core evidence
 
-### Verified before repository bootstrap
-
-The dependency-free Kotlin core was compiled and executed with JDK 21 / `kotlinc` in the preparation environment. Two smoke cases passed:
+The dependency-free Kotlin core now exercises four conformance cases:
 
 ```text
-PASS verified=VERIFIED observed=ON
-PASS contradicted=CONTRADICTED observed=OFF
+PASS VERIFIED
+PASS CONTRADICTED
+PASS DENY
+PASS READ_ONLY
 ```
 
-The second case deliberately simulates a platform call that returns normally while the requested state does not occur.
+GitHub Actions validates the same core through two independent build paths:
 
-### Not yet verified
+- Kotlin CLI: `./scripts/test-core.sh` → `kotlinc`
+- Gradle: `gradle :core:coreDemo`
 
-- GitHub Actions smoke workflow
+Both jobs passed on the core-conformance PR before merge.
+
+The cases mean:
+
+- **VERIFIED** — authorized execution completed and observed state matched the expected postcondition.
+- **CONTRADICTED** — execution completed but observed state disagreed with the expected postcondition.
+- **DENY** — unknown tool was blocked before execution; verification was `NOT_ATTEMPTED`.
+- **READ_ONLY** — data was read without inventing a side-effect verification claim.
+
+See [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) for the behavioral contract and [`docs/STATUS.md`](docs/STATUS.md) for the evidence ledger.
+
+## Still not verified
+
 - Android integration skeleton compilation
 - Google ADK Kotlin LiteRT-LM example on the target phone
 - Real flashlight execution and postcondition verification on hardware
+- Android receipt persistence
 - Any upstream contribution to Google
-
-See [`docs/STATUS.md`](docs/STATUS.md) for the evidence ledger.
 
 ## Repository structure
 
@@ -47,12 +61,12 @@ See [`docs/STATUS.md`](docs/STATUS.md) for the evidence ledger.
 frog-mobile/
 ├── core/                 # dependency-free Kotlin policy/verification core
 ├── android-skeleton/     # Android + Google ADK integration sketch
-├── docs/                 # decisions, status, handoff, setup, upstream objective
+├── docs/                 # decisions, conformance, status, handoff, setup
 ├── .github/              # issue templates, PR template, CI
-└── scripts/test-core.sh  # local smoke test
+└── scripts/test-core.sh  # Kotlin CLI smoke test
 ```
 
-## Run the verified core demo
+## Run the core smoke
 
 Requires JDK 21+ and `kotlinc`:
 
@@ -60,11 +74,10 @@ Requires JDK 21+ and `kotlinc`:
 ./scripts/test-core.sh
 ```
 
-Expected output:
+You can also run the Gradle path:
 
-```text
-PASS verified=VERIFIED observed=ON
-PASS contradicted=CONTRADICTED observed=OFF
+```bash
+gradle :core:coreDemo
 ```
 
 ## First real-device milestone — M0

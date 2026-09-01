@@ -6,28 +6,52 @@ This file separates demonstrated facts from proposed work. Update it when eviden
 
 ## Demonstrated
 
-### Core invariant smoke test
+### Four-case core conformance smoke
 
-The dependency-free Kotlin core was compiled and executed with JDK 21 / `kotlinc` in the preparation environment.
-
-Observed output:
+The dependency-free Kotlin core exercises four cases:
 
 ```text
-PASS verified=VERIFIED observed=ON
-PASS contradicted=CONTRADICTED observed=OFF
+VERIFIED
+CONTRADICTED
+DENY
+READ_ONLY
 ```
 
-Interpretation:
+Behavior asserted by the smoke:
 
-- `VERIFIED` means the observed state matched the requested postcondition.
-- `CONTRADICTED` means execution reported completion but observation disagreed with the requested postcondition.
+- **VERIFIED** — authorized reversible action; execution attempted and completed; observed state matched expected state.
+- **CONTRADICTED** — execution attempted and completed; observed state disagreed with expected state.
+- **DENY** — unknown tool was denied before execution; an adapter that throws on `execute()` or `observe()` was not invoked; verification = `NOT_ATTEMPTED`.
+- **READ_ONLY** — battery-like data was returned under `RiskClass.READ_ONLY` with no side-effect postcondition; verification = `NOT_ATTEMPTED`.
 
-This demonstrates the core distinction. It does **not** demonstrate Android hardware control.
+### Dual-path GitHub CI
+
+PR #1, commit `bf0008522f47d133d8af1ebe88fe7118c3bb2385`, was tested by GitHub Actions run `33514465700`.
+
+Both jobs completed successfully:
+
+- **Kotlin CLI smoke** — installed Kotlin compiler 2.3.21 and ran `./scripts/test-core.sh`.
+- **Gradle smoke** — ran `gradle :core:coreDemo` with Gradle 9.7.1.
+
+This demonstrates the four-case core behavior through two build paths. It does **not** demonstrate Android hardware control.
+
+### Deny semantics decision
+
+For policy-denied requests:
+
+```text
+authorization = DENY
+executionAttempted = false
+executionCompleted = false
+verification = NOT_ATTEMPTED
+```
+
+`INDETERMINATE` is reserved for cases where postcondition verification is applicable but the observed state cannot be established.
+
+See `docs/DECISION_DENY_SEMANTICS.md`.
 
 ## Implemented but not yet demonstrated
 
-- Gradle project metadata for the core module.
-- GitHub Actions smoke workflow.
 - Android/ADK integration skeleton.
 - Android torch adapter using `CameraManager` / `TorchCallback`.
 - In-memory receipt storage.
@@ -73,8 +97,11 @@ Required proof:
 FROG is not yet:
 
 - a general Android automation agent;
+- an installed Android APK;
 - a production security boundary;
 - a complete governance framework;
 - an AppFunctions implementation;
+- a persistent Android receipt system;
 - a Google-supported project;
-- an upstream ADK feature.
+- an upstream ADK feature;
+- a revenue-producing product.
